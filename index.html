@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Need Work BD Admin</title>
+<style>
+:root{--p:#4f46e5;--o:#ff7a1a;--bg:#f5f6ff;--card:#fff;--ink:#1b1840;--mut:#625f86;--line:#e1e1f2}
+@media(prefers-color-scheme:dark){:root{--bg:#0f0e24;--card:#1a1838;--ink:#eeeefc;--mut:#a3a1c9;--line:#2c2a55}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#1e1b4b;color:#fff;padding:12px 16px;font-weight:700;font-size:18px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0}
+nav button{border:0;background:var(--bg);color:var(--ink);padding:8px 14px;border-radius:99px;font:inherit;font-weight:600;white-space:nowrap;cursor:pointer}
+nav button.on{background:var(--p);color:#fff}nav b{background:var(--o);color:#fff;border-radius:99px;padding:0 7px;margin-left:5px;font-size:13px}
+main{max-width:900px;margin:auto;padding:14px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;display:grid;gap:6px}
+.c small{color:var(--mut)}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+button.b{border:0;border-radius:99px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer;background:var(--p);color:#fff}
+.b.g{background:#0f9d6e}.b.r{background:#e11d48}.b.l{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+input{font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:inherit;width:100%}
+label{display:grid;gap:3px;font-weight:600;margin-bottom:8px}
+.pics{display:flex;gap:8px;flex-wrap:wrap}.pics img{max-width:100%;width:300px;border-radius:10px;border:1px solid var(--line)}
+.tag{display:inline-block;border-radius:99px;padding:1px 10px;font-size:13px;font-weight:700;background:#e0e7ff;color:#3730a3;width:max-content}
+#t{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1e1b4b;color:#fff;padding:10px 18px;border-radius:99px;display:none;z-index:9}
+</style></head><body>
+<header>Need Work BD: Admin</header>
+<nav id="nav"></nav><main id="m">Loading…</main><div id="t"></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S=JSON.parse(localStorage.adm||"{}"),D={Workers:[],Customers:[],Hires:[],Messages:[]},PW,PC,PH,CFG={BLOCKED:[]},tab="pending";
+const WH=["id","name","category","location","description","status"],CH=["id","name","status"],HH=["hireid","customerid","workerid","workername","status","phone"];
+const toast=m=>{const t=$("#t");t.textContent=m;t.style.display="block";clearTimeout(toast.x);toast.x=setTimeout(()=>t.style.display="none",3500)};
+/* ---- GitHub ---- */
+const enc=s=>btoa(unescape(encodeURIComponent(s))),dec=s=>decodeURIComponent(escape(atob(s.replace(/\n/g,""))));
+const api=(p,o={})=>fetch(`https://api.github.com/repos/${S.owner}/${S.repo}/contents/${p}`+(o.method?"":`?ref=${S.branch||"main"}&t=${Date.now()}`),{...o,headers:{Authorization:"Bearer "+S.token,Accept:"application/vnd.github+json"}});
+async function rd(p){const r=await api(p);if(r.status==404)return{text:"",sha:null};if(!r.ok)throw new Error("GitHub error "+r.status+" on "+p+". Check username, repo and token.");const j=await r.json();return{text:dec(j.content),sha:j.sha}}
+async function wr(p,text,sha,msg){const r=await api(p,{method:"PUT",body:JSON.stringify({message:msg,content:enc(text),sha:sha||undefined,branch:S.branch||"main"})});if(!r.ok)throw new Error("Could not save "+p+" ("+r.status+"). The token needs Contents: read and write.")}
+/* ---- CSV ---- */
+function parse(t){const r=[];let w=[],f="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'&&t[i+1]=='"'){f+='"';i++}else if(c=='"')q=false;else f+=c}else if(c=='"')q=true;else if(c==","){w.push(f);f=""}else if(c=="\n"){w.push(f);r.push(w);w=[];f=""}else if(c!="\r")f+=c}if(f||w.length){w.push(f);r.push(w)}return r}
+function table(t,def){const r=parse(t).filter(x=>x.length>1);const h=r.length?r.shift().map(x=>x.trim().toLowerCase()):[...def];def.forEach(k=>{if(!h.includes(k))h.push(k)});return{h,rows:r.map(x=>Object.fromEntries(h.map((k,i)=>[k,x[i]||""])))}}
+const qt=v=>/[",\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':String(v);
+const csv=t=>[t.h.join(","),...t.rows.map(o=>t.h.map(k=>qt(o[k]??"")).join(","))].join("\n")+"\n";
+async function edit(p,def,fn,msg){const f=await rd(p),t=table(f.text,def);fn(t);await wr(p,csv(t),f.sha,msg)}
+async function saveCfg(){const f=await rd("config.json");await wr("config.json",JSON.stringify(CFG,null,2)+"\n",f.sha,"Update config")}
+/* ---- Sheet ---- */
+const sh=(a,p={})=>fetch(S.url+"?"+new URLSearchParams({key:S.key,action:a,...p})).then(r=>r.json());
+const setSt=(tb,id,st)=>sh("status",{tab:tb,id,status:st}).catch(()=>{});
+/* ---- load ---- */
+async function load(){
+ if(!S.owner||!S.repo||!S.token||!S.url||!S.key){tab="settings";return render()}
+ $("#m").textContent="Loading…";
+ try{
+  const [d,w,c,g]=await Promise.all([sh("data"),rd("workers.csv"),rd("customers.csv"),rd("config.json")]);
+  if(d.error)throw new Error("Sheet says: "+d.error+". Check the Apps Script URL and admin key.");
+  D=d;PW=table(w.text,WH);PC=table(c.text,CH);try{CFG=JSON.parse(g.text||"{}")}catch(e){CFG={}}
+  CFG.BLOCKED=CFG.BLOCKED||[];
+ }catch(e){toast(e.message);tab="settings"}
+ render()}
+const pendW=()=>(D.Workers||[]).filter(x=>x.status=="Pending"&&!PW.rows.some(r=>r.id==x.id));
+const pendC=()=>(D.Customers||[]).filter(x=>x.status=="Pending"&&!PC.rows.some(r=>r.id==x.id));
+const hireList=()=>[...(D.Hires||[])].reverse();
+function render(){
+ const T=[["pending","Pending",PW?pendW().length+pendC().length:0],["workers","Workers"],["customers","Customers"],["hires","Hires",PW?hireList().filter(h=>h.status=="Requested").length:0],["messages","Messages"],["settings","Settings"]];
+ $("#nav").innerHTML=T.map(t=>`<button class="${tab==t[0]?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}${t[2]?`<b>${t[2]}</b>`:""}</button>`).join("")+`<button onclick="load()">↻ Refresh</button>`;
+ $("#m").innerHTML=PW||tab=="settings"?({pending,workers,customers,hires,messages,settings})[tab]():"Loading…";
+}
+async function act(fn,ok){try{await fn();toast(ok);await load()}catch(e){toast(e.message)}}
+/* ---- views ---- */
+function pending(){
+ const w=pendW(),c=pendC();
+ return `<h3>Workers waiting (${w.length})</h3>`+(w.map(x=>`<div class="c"><b>${esc(x.name)}</b> <span class="tag">${esc(x.category)}</span>
+  <small>ID ${esc(x.id)} | NID ${esc(x.idcard)} | ${esc(x.phone)} | ${esc(x.email)}</small><small>Address: ${esc(x.address)} | Wants to work in: ${esc(x.location)}</small><div>${esc(x.description)}</div>
+  <div id="p${x.id}" class="pics"></div><div class="row"><button class="b l" onclick="pics('${x.id}','${esc(x.nidfront)}','${esc(x.nidback)}')">View NID photos</button>
+  <button class="b g" onclick="appW('${x.id}')">Approve</button><button class="b r" onclick="rej('Workers','${x.id}')">Reject</button></div></div>`).join("")||"<p>No workers waiting.</p>")
+ +`<h3>Customers waiting (${c.length})</h3>`+(c.map(x=>`<div class="c"><b>${esc(x.name)}</b>
+  <small>ID ${esc(x.id)} | NID ${esc(x.nid)} | ${esc(x.phone)}</small><small>Address: ${esc(x.address)} | Needs: ${esc(x.need)}</small>
+  <div id="p${x.id}" class="pics"></div><div class="row"><button class="b l" onclick="pics('${x.id}','${esc(x.nidfront)}','${esc(x.nidback)}')">View NID photos</button>
+  <button class="b g" onclick="appC('${x.id}')">Approve</button><button class="b r" onclick="rej('Customers','${x.id}')">Reject</button></div></div>`).join("")||"<p>No customers waiting.</p>")}
+async function pics(id,a,b){const el=$("#p"+id);el.textContent="Loading photos…";
+ try{const [f,k]=await Promise.all([sh("photo",{u:a}),sh("photo",{u:b})]);el.innerHTML=`<div><small>Front</small><br><img src="${f.img}"></div><div><small>Back</small><br><img src="${k.img}"></div>`}catch(e){el.textContent="Could not load photos."}}
+const appW=id=>act(async()=>{const x=D.Workers.find(r=>r.id==id);await edit("workers.csv",WH,t=>{if(!t.rows.some(r=>r.id==id))t.rows.push({id,name:x.name,category:x.category,location:x.location,description:x.description,status:"Approved"})},"Approve worker "+id);await setSt("Workers",id,"Approved")},"Worker approved and live");
+const appC=id=>act(async()=>{const x=D.Customers.find(r=>r.id==id);await edit("customers.csv",CH,t=>{if(!t.rows.some(r=>r.id==id))t.rows.push({id,name:x.name,status:"Approved"})},"Approve customer "+id);await setSt("Customers",id,"Approved")},"Customer approved");
+const rej=(tb,id)=>confirm("Reject "+id+"?")&&act(()=>setSt(tb,id,"Rejected"),"Rejected");
+function workers(){return `<h3>Live workers (${PW.rows.length})</h3>`+(PW.rows.map(r=>`<div class="c"><b>${esc(r.name)}</b> <span class="tag">${esc(r.category)}</span><small>${esc(r.id)} | ${esc(r.location)}</small>
+ <div class="row"><button class="b r" onclick="rmW('${r.id}')">Remove from site</button></div></div>`).join("")||"<p>None yet.</p>")}
+const rmW=id=>confirm("Remove "+id+" from the public site?")&&act(async()=>{await edit("workers.csv",WH,t=>t.rows=t.rows.filter(r=>r.id!=id),"Remove worker "+id);await setSt("Workers",id,"Removed")},"Removed");
+function customers(){return `<h3>Approved customers (${PC.rows.length})</h3>`+(PC.rows.map(r=>{const b=CFG.BLOCKED.map(x=>x.toUpperCase()).includes(r.id.toUpperCase());return `<div class="c"><b>${esc(r.name||r.id)}</b> ${b?'<span class="tag" style="background:#ffe4e6;color:#9f1239">Blocked</span>':""}<small>${esc(r.id)}</small>
+ <div class="row"><button class="b ${b?"g":"r"}" onclick="blk('${r.id}',${!b})">${b?"Unblock":"Block"}</button><button class="b l" onclick="rmC('${r.id}')">Remove</button></div></div>`}).join("")||"<p>None yet.</p>")}
+const blk=(id,on)=>act(async()=>{CFG.BLOCKED=CFG.BLOCKED.filter(x=>x.toUpperCase()!=id.toUpperCase());if(on)CFG.BLOCKED.push(id);await saveCfg()},on?"Blocked":"Unblocked");
+const rmC=id=>confirm("Remove "+id+"?")&&act(async()=>{await edit("customers.csv",CH,t=>t.rows=t.rows.filter(r=>r.id!=id),"Remove customer "+id);await setSt("Customers",id,"Removed")},"Removed");
+function hires(){return `<h3>Hire requests</h3><p><small>Workers accept their own requests from Worker Login. Use these buttons only if you need to step in.</small></p>`+(hireList().map(h=>{const w=D.Workers.find(r=>r.id==h.workerId),cu=D.Customers.find(r=>r.id==h.customerId);
+ return `<div class="c"><b>${esc(h.workerName||h.workerId)}</b> <span class="tag">${esc(h.status||"Requested")}</span><small>Hire ${esc(h.id)} | Customer ${esc(h.customerId)}${cu?" ("+esc(cu.name)+", "+esc(cu.phone)+")":""}</small><small>Worker phone: ${w?esc(w.phone):"not found"}</small>
+ <div class="row"><button class="b g" onclick="setH('${h.id}','Accepted')">Accept for worker</button><button class="b r" onclick="setH('${h.id}','Declined')">Decline</button><button class="b l" onclick="setH('${h.id}','Completed')">Complete (hide phone)</button></div></div>`}).join("")||"<p>No hire requests.</p>")}
+const setH=(id,st)=>act(()=>setSt("Hires",id,st),"Hire marked "+st);
+function messages(){return `<h3>Customer messages</h3>`+([...(D.Messages||[])].reverse().map(m=>`<div class="c"><small>From customer ${esc(m.cid)} to worker ${esc(m.workerId)}</small><div>${esc(m.text)}</div></div>`).join("")||"<p>No messages.</p>")}
+function settings(){const g=k=>esc(S[k]||"");return `<h3>Settings</h3><p><small>Saved only in this browser. The token and key never go on the public site.</small></p>
+ <label>GitHub username<input id="s_owner" value="${g("owner")}"></label><label>Repository name<input id="s_repo" value="${g("repo")}"></label><label>Branch<input id="s_branch" value="${g("branch")||"main"}"></label>
+ <label>GitHub token (fine-grained, Contents: read and write)<input id="s_token" type="password" value="${g("token")}"></label>
+ <label>Apps Script web app URL<input id="s_url" value="${g("url")}"></label><label>Admin key (same as ADMIN_KEY in code.gs)<input id="s_key" type="password" value="${g("key")}"></label>
+ <div class="row"><button class="b" onclick="saveS()">Save and connect</button></div>
+ ${PW?`<h3>Site connection</h3><label>Apps Script URL used by the live site (config.json ENDPOINT)<input id="s_ep" value="${esc(CFG.ENDPOINT||"")}"></label><div class="row"><button class="b g" onclick="saveEP()">Update live site</button></div>`:""}`}
+function saveS(){["owner","repo","branch","token","url","key"].forEach(k=>S[k]=$("#s_"+k).value.trim());localStorage.adm=JSON.stringify(S);tab="pending";load()}
+const saveEP=()=>act(async()=>{CFG.ENDPOINT=$("#s_ep").value.trim();await saveCfg()},"Live site updated");
+load();
+</script></body></html>
